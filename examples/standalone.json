@@ -1,0 +1,19 @@
+{
+    "model_zoo_config" : "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml",
+    "model.weights" : "model_final.pth",
+    "model.score_threshold" : 0.3,
+    "model.metadata_catalog" : "screw_prod",
+    "model.roi_heads.batch_size_per_image" : 256,
+    "model.roi_heads.num_classes" : 1,
+    "meshes" : [
+        {   
+            "name" : "screw",
+            "mesh_file" : "ToyScrew-Yellow.stl",
+            "hu_index.grid_size" : 0.0005,
+            "hough_transform.profile.grid_size" : 0.001,
+            "hough_transform.profile.accumulation_radius" : 0.001,
+            "hough_transform.accumulator.grid_size" : 0.005
+        }
+    ]
+    
+}
