@@ -63,10 +63,11 @@ def filter(
         if depth[int(img_coords[1]), int(img_coords[0])] > oriented[2]:
             mask[idx, idy, idz] = False
     
-
 def accumulator_profile(mesh, name, grid_size = 0.0005, radius = 0.001):
     import os
     cache_dir = user_cache_dir("Mesh-Pose-Detector")
+    if not os.path.isdir(cache_dir):
+        os.path.mkdir(cache_dir)
     profile_dir = os.path.join(cache_dir, 'HoughTransform')
     if not os.path.isdir(profile_dir):
         os.mkdir(profile_dir)
