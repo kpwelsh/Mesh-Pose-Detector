@@ -11,7 +11,7 @@ class HuIndex:
     def __init__(self, name, mesh, grid_size = 0.0005):
         cache_dir = user_cache_dir("Mesh-Pose-Detector")
         if not os.path.isdir(cache_dir):
-            os.path.mkdir(cache_dir)
+            os.mkdir(cache_dir)
         index_dir = os.path.join(cache_dir, 'HuIndex')
         if not os.path.isdir(index_dir):
             os.mkdir(index_dir)
