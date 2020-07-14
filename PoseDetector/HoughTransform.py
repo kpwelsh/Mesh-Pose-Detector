@@ -7,6 +7,7 @@ import time
 from numba import cuda
 from PoseDetector.BoundingBox import BoundingBox
 import numpy as np
+from appdirs import user_cache_dir
 
 
 @cuda.jit('(f4[:,:,:], i4[:], f4[:], f4, f4[:], i4[:], f4[:], f4, f4[:,:])')
@@ -65,7 +66,8 @@ def filter(
 
 def accumulator_profile(mesh, name, grid_size = 0.0005, radius = 0.001):
     import os
-    profile_dir = 'profiles'
+    cache_dir = user_cache_dir("Mesh-Pose-Detector")
+    profile_dir = os.path.join(cache_dir, 'HoughTransform')
     if not os.path.isdir(profile_dir):
         os.mkdir(profile_dir)
     bottom_left = -np.max(mesh.vertices, axis = 0) - 2*radius

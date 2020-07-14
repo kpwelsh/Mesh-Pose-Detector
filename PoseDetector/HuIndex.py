@@ -5,13 +5,15 @@ import trimesh
 import os
 from scipy.stats import special_ortho_group
 import cv2
+from appdirs import user_cache_dir
 
 class HuIndex:
     def __init__(self, name, mesh, grid_size = 0.0005):
-
-        if not os.path.isdir('Indices'):
-            os.mkdir('Indices')
-        index_name = os.path.join('Indices', name)
+        cache_dir = user_cache_dir("Mesh-Pose-Detector")
+        index_dir = os.path.join(cache_dir, 'HuIndex')
+        if not os.path.isdir(index_dir):
+            os.mkdir(index_dir)
+        index_name = os.path.join(index_dir, name)
 
         p = index.Property()
         p.dimension = 7
