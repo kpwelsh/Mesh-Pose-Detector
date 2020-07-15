@@ -98,7 +98,7 @@ class PoseDetector:
             hu = cv2.HuMoments(cv2.moments(np.float32(mask)))
             profile = self.MeshProfiles[instances[i].pred_classes[0]]
             (R, o), cloud_orientation = self.get_best_pose(profile, hu, depth, K, cloud)
-            detected_objects.append(DetectedObject(R, o, instances[i].pred_boxes, mask, profile.MeshFile, profile.Trimesh))
+            detected_objects.append(DetectedObject(R, o, instances[i].pred_boxes, mask, profile.MeshFile, profile.Name, profile.Trimesh))
         return detected_objects
 
     def get_best_pose(self, profile, hu, depth, K, cloud):
