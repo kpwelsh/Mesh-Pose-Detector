@@ -16,47 +16,96 @@ from scipy.ndimage import morphology
 from collections import Counter
 from PoseDetector.HoughTransform import HoughTransform
 from PoseDetector.BoundingBox import BoundingBox
-from numba import cuda
 import functools
 
 from PoseDetector.DetectedObject import DetectedObject
 from PoseDetector.MeshProfile import MeshProfile
+import cupy as cp
 
 
-@cuda.jit
-def valid_positions_device(K, R, vertices, depth, d_shape, grid_size, mask, m_shape, lower):
-    id = cuda.blockIdx.x * 1024 + cuda.threadIdx.x
-    if id >= mask.size:
-        return
-    idx = id // (m_shape[2] * m_shape[1])
-    idy = id // m_shape[2]
-    idy = idy - (idy // m_shape[1]) * m_shape[1]
-    idz = id - idx * (m_shape[2] * m_shape[1]) - idy * m_shape[2]
-    pos_x = lower[0] + (0.5 + idx) * grid_size
-    pos_y = lower[1] + (0.5 + idy) * grid_size
-    pos_z = lower[2] + (0.5 + idz) * grid_size
 
-    for i in range(len(vertices)):
-        v_x, v_y, v_z = vertices[i,0], vertices[i,1], vertices[i,2]
-        v_x += pos_x
-        v_y += pos_y
-        v_z += pos_z
-        x = R[0,0] * v_x + R[0,1] * v_y + R[0,2] * v_z
-        y = R[1,0] * v_x + R[1,1] * v_y + R[1,2] * v_z
-        z = R[2,0] * v_x + R[2,1] * v_y + R[2,2] * v_z
+valid_positions_device = cp.RawKernel(
+r'''
+extern "C" __global__
+void valid_positions_device(
+        float* K, float* R, float* vertices, int* depth, int* d_shape, 
+        float grid_size, float* mask, int* m_shape, float* lower, int n)
+    
+{
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    int m_size = m_shape[0]*m_shape[1]*m_shape[2];
+    if (id >= (m_size * n)) {
+        return;
+    }
+    int i = id / m_size;
+    id = id % m_size;
+    int idx = id / (m_shape[2] * m_shape[1]);
+    int idy = id / m_shape[2];
+    idy = idy - (idy / m_shape[1]) * m_shape[1];
+    int idz = id - idx * (m_shape[2] * m_shape[1]) - idy * m_shape[2];
+    float pos_x = vertices[i] + lower[0] + (0.5 + idx) * grid_size;
+    float pos_y = vertices[i + n] + lower[1] + (0.5 + idy) * grid_size;
+    float pos_z = vertices[i + 2 * n] + lower[2] + (0.5 + idz) * grid_size; 
+    float x = R[0] * pos_x + R[3] * pos_y + R[6] * pos_z; 
+    float y = R[1] * pos_x + R[4] * pos_y + R[7] * pos_z; 
+    float z = R[2] * pos_x + R[5] * pos_y + R[8] * pos_z;
 
-        img_z = K[2,0] * x + K[2,1] * y + K[2,2] * z
-        img_x = int((K[0,0] * x + K[0,1] * y + K[0,2] * z) // img_z)
-        img_y = int((K[1,0] * x + K[1,1] * y + K[1,2] * z) // img_z)
-        if y >= 0 and y < d_shape[0] \
-            and x >= 0 and x < d_shape[1] \
-            and depth[img_y,img_x] - z*1000 > 20:
-            mask[idx, idy, idz] = 0
+    float img_z = K[2] * x + K[5] * y + K[8] * z;
+    int img_x = (K[0] * x + K[3] * y + K[6] * z) / img_z;
+    int img_y = (K[1] * x + K[4] * y + K[7] * z) / img_z;
+
+    if (img_y >= 0 && img_y < d_shape[0]
+        && img_x >= 0 && img_x < d_shape[1]
+        && depth[img_y + img_x * d_shape[0]] - z * 1000 > 20){
+        
+        mask[id] = 0;
+    }
+}
+''', 'valid_positions_device')
+
+# @cuda.jit
+# def valid_positions_device(K, R, vertices, depth, d_shape, grid_size, mask, m_shape, lower):
+#     id = cuda.blockIdx.x * 512 + cuda.threadIdx.x
+#     if id >= mask.size:
+#         return
+#     idx = id // (m_shape[2] * m_shape[1])
+#     idy = id // m_shape[2]
+#     idy = idy - (idy // m_shape[1]) * m_shape[1]
+#     idz = id - idx * (m_shape[2] * m_shape[1]) - idy * m_shape[2]
+#     pos_x = lower[0] + (0.5 + idx) * grid_size
+#     pos_y = lower[1] + (0.5 + idy) * grid_size
+#     pos_z = lower[2] + (0.5 + idz) * grid_size
+
+#     for i in range(len(vertices)):
+#         v_x, v_y, v_z = vertices[i,0], vertices[i,1], vertices[i,2]
+#         v_x += pos_x
+#         v_y += pos_y
+#         v_z += pos_z
+#         x = R[0,0] * v_x + R[0,1] * v_y + R[0,2] * v_z
+#         y = R[1,0] * v_x + R[1,1] * v_y + R[1,2] * v_z
+#         z = R[2,0] * v_x + R[2,1] * v_y + R[2,2] * v_z
+
+#         img_z = K[2,0] * x + K[2,1] * y + K[2,2] * z
+#         img_x = int((K[0,0] * x + K[0,1] * y + K[0,2] * z) // img_z)
+#         img_y = int((K[1,0] * x + K[1,1] * y + K[1,2] * z) // img_z)
+#         if y >= 0 and y < d_shape[0] \
+#             and x >= 0 and x < d_shape[1] \
+#             and depth[img_y,img_x] - z*1000 > 20:
+#             mask[idx, idy, idz] = 0
 
 def valid_positions(R, vertices, depth, K, mask, lower, grid_size):
-    valid_positions_device[mask.size // 1024 + 1, 1024](
-        K, R, vertices, depth, np.array(depth.shape), grid_size, mask, np.array(mask.shape), lower
-    )
+    valid_positions_device(((mask.size * len(vertices)) // 512 + 1,), (512,), (
+        cp.asarray(K.flatten()),
+        cp.asarray(R.flatten()),
+        cp.asarray(vertices.flatten()),
+        cp.asarray(depth.flatten()),
+        cp.array(depth.shape, cp.int), 
+        cp.float32(grid_size), 
+        cp.asarray(mask.flatten(), cp.int),
+        cp.array(mask.shape, cp.int), 
+        cp.asarray(lower),
+        cp.int(len(vertices))
+    ))
 
 class PoseDetector:
     def __init__(self, **config):
