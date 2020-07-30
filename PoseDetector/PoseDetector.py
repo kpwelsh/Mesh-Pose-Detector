@@ -141,14 +141,12 @@ class PoseDetector:
                     R3[:2,:2] = R2
                     R = zflip @ flip @ R3.T @ R
 
-                    import time
-                    s = time.time()
                     o, val = profile.HoughTransform.vote(
-                        cloud_sample @ R, *bbox.rotated(R.T), 
+                        cloud_sample @ R.T, *bbox.rotated(R), 
                         functools.partial(valid_positions, R, profile.Trimesh.vertices, depth, K)
                     )
 
-                    tmp_config = (-val, (R, o))
+                    tmp_config = (-val, (R.T, R.T @ o))
                     if tmp_config[0] < best_config[0]:
                         best_config = tmp_config
         return best_config[1], cloud_orientation
@@ -160,7 +158,7 @@ class PoseDetector:
         y, x = np.where(mask)
         img_coords = np.column_stack((x, y, np.ones_like(depth_values)))
         camera_coords = np.linalg.inv(K) @ (img_coords.T * depth_values)
-        return camera_coords.T / 1000.0
+        return camera_coords.T / 1000
 
     def select_largest_cluster(self, cloud):
         clustering = DBSCAN(eps=0.01).fit(cloud)

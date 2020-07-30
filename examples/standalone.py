@@ -38,7 +38,7 @@ if __name__ == '__main__':
     for obj in detected_objects:
         R, o, mesh = obj.R, obj.o, obj.Mesh
         vis.add_geometry(o3d.geometry.TriangleMesh(
-            o3d.utility.Vector3dVector((((mesh.vertices  + o) @ R.T))),
+            o3d.utility.Vector3dVector(mesh.vertices @ R.T + o),
             o3d.utility.Vector3iVector(mesh.faces)
         ))
 
